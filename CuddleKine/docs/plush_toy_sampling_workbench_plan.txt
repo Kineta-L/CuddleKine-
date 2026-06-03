@@ -1,0 +1,769 @@
+毛绒玩具打样设计工作台整体修改流程方案
+版本日期：2026-06-03
+项目路径：E:\TaiShen\plush-toy-designer
+
+一、项目定位
+
+当前系统不应只定位为“AI 毛绒图生成器”，而应升级为：
+
+    毛绒玩具打样设计工作台
+    Plush Toy Sampling & Design Workbench
+
+目标用户：
+
+    1. 毛绒玩具设计师
+    2. 接单客服 / 设计助理
+    3. 打样工厂业务人员
+    4. 小批量 IP 周边 / 定制公仔团队
+
+核心价值：
+
+    客户给出参考图、聊天记录、手绘图、照片后，系统帮助设计师完成：
+
+    1. 订单建档
+    2. 素材整理
+    3. 需求 brief 结构化
+    4. 多模型生成毛绒样品图
+    5. 局部修改和版本确认
+    6. 正面 / 侧面 / 背面多视图
+    7. 客户确认板导出
+    8. 工厂打样资料包导出
+
+二、现有技术栈
+
+当前项目已有基础：
+
+    前端：
+        React
+        TypeScript
+        Vite
+        React Router
+
+    桌面端：
+        Tauri v2
+        Rust
+
+    后端：
+        Python
+        FastAPI
+        SQLAlchemy
+        SQLite
+        Pillow
+        httpx
+
+    生成侧：
+        ComfyUI 本地 API
+        OpenAI image service 初版
+        Replicate service 初版
+        Mock service
+
+    存储：
+        SQLite 数据库
+        本地素材目录 data/materials
+        本地输出目录 outputs/generated
+
+三、推荐目标技术栈
+
+1. 前端技术栈
+
+    保留：
+        React + TypeScript + Vite
+        React Router
+        Tauri v2
+
+    建议新增：
+        Zustand 或 React Context
+            用于管理全局模型配置、系统状态、生成状态。
+
+        TanStack Query（可选）
+            用于 API 请求缓存、刷新、错误状态管理。
+            如果短期不想引入新依赖，可以继续用当前手写 api client。
+
+        lucide-react（可选）
+            用于工具按钮和状态图标。
+
+    不建议短期引入：
+        Next.js
+        大型 UI 框架
+        复杂状态管理 Redux
+
+    原因：
+        当前是本地桌面工具，不需要服务端渲染。
+        先保证业务流程和生成质量，不要过早扩大前端复杂度。
+
+2. 后端技术栈
+
+    保留：
+        FastAPI
+        SQLAlchemy
+        SQLite
+        Pillow
+        httpx
+
+    建议新增：
+        Pydantic Settings
+            管理多模型 API key、provider 配置、默认模型、成本参数。
+
+        Alembic（第二阶段）
+            当前 SQLite 直接 create_all 可以原型运行。
+            进入生产后需要数据库迁移。
+
+        rembg 或 segment-anything / SAM（第二阶段）
+            用于更强主体抠图。
+            当前 Pillow 边缘 flood-fill 只能处理简单背景。
+
+        reportlab 或 playwright-to-pdf（第二阶段）
+            用于导出 PDF 客户确认板。
+
+3. 模型 / 生成技术栈
+
+    第一优先级：
+        OpenAI GPT Image
+            用于高质量客户样品图。
+            适合理解参考图、保留角色身份、转成毛绒玩具样品图。
+
+        ComfyUI
+            用于本地草稿、低成本探索、多视图尝试。
+
+    第二优先级：
+        Replicate
+            作为云端备用模型平台。
+
+        Stability AI
+            用于图生图、局部修改、背景处理等场景。
+
+    第三优先级：
+        国内热门模型 API
+            通义万相
+            即梦 / 火山引擎图像服务
+            LiblibAI
+            可灵 / Kling 图像或视频能力
+
+    注意：
+        市面 API 更新很快，provider 层必须做成可插拔。
+        不要把业务逻辑写死在某一个模型里。
+
+四、总体架构改造
+
+目标架构：
+
+    前端 Tauri / React
+        |
+        | HTTP API
+        v
+    FastAPI 后端
+        |
+        | 统一生成接口
+        v
+    Provider Registry
+        |-- OpenAI GPT Image Provider
+        |-- ComfyUI Provider
+        |-- Replicate Provider
+        |-- Stability Provider
+        |-- Tongyi Provider
+        |-- Jimeng Provider
+        |-- Mock Provider
+
+    FastAPI 后端
+        |
+        | 本地存储
+        v
+    SQLite + data/materials + outputs/generated + exports
+
+五、后端模块改造
+
+1. 新增 provider registry
+
+    文件建议：
+
+        backend/app/services/providers/base.py
+        backend/app/services/providers/registry.py
+        backend/app/services/providers/comfyui_provider.py
+        backend/app/services/providers/openai_provider.py
+        backend/app/services/providers/replicate_provider.py
+        backend/app/services/providers/mock_provider.py
+
+    统一接口：
+
+        class ImageProvider:
+            id: str
+            name: str
+            supports_text_to_image: bool
+            supports_image_to_image: bool
+            supports_inpaint: bool
+            supports_transparent_background: bool
+
+            async def health_check(self) -> ProviderHealth
+
+            async def generate(self, request: GenerateJob) -> GenerateResult
+
+    统一请求：
+
+        GenerateJob:
+            order_id
+            provider
+            model
+            quality_mode
+            prompt
+            negative_prompt
+            reference_images
+            source_generation_id
+            view_type
+            output_path
+            transparent_background
+            params
+
+    统一结果：
+
+        GenerateResult:
+            file_path
+            provider
+            model
+            duration
+            prompt
+            raw_response
+            cost_estimate
+
+2. 修改生成 API
+
+    当前接口：
+
+        POST /api/generation/generate
+
+    增加字段：
+
+        provider: string
+            comfyui
+            openai
+            replicate
+            mock
+
+        model: string | null
+
+        quality_mode: string
+            draft
+            sample
+            final
+
+        reference_material_id: number | null
+
+        transparent_background: boolean
+
+    示例：
+
+        {
+          "order_id": 123,
+          "provider": "openai",
+          "model": "gpt-image-1",
+          "quality_mode": "sample",
+          "view_type": "main",
+          "derivation_type": "main_view_candidate",
+          "reference_material_id": 45,
+          "transparent_background": true
+        }
+
+3. 新增模型列表接口
+
+    API：
+
+        GET /api/providers
+
+    返回：
+
+        [
+          {
+            "id": "openai",
+            "name": "GPT Image 高质量样品图",
+            "enabled": true,
+            "configured": true,
+            "models": [
+              {
+                "id": "gpt-image-1",
+                "name": "GPT Image",
+                "quality": "high",
+                "best_for": "客户样品图 / 高还原"
+              }
+            ]
+          },
+          {
+            "id": "comfyui",
+            "name": "ComfyUI 本地草稿",
+            "enabled": true,
+            "configured": true,
+            "models": [
+              {
+                "id": "sd_xl_base_1.0",
+                "name": "SDXL Local",
+                "quality": "draft",
+                "best_for": "低成本草稿 / 本地离线"
+              }
+            ]
+          }
+        ]
+
+4. 数据库字段调整
+
+    generation_records 表建议增加：
+
+        provider              使用的供应商
+        provider_model        使用的模型
+        quality_mode          draft/sample/final
+        prompt                最终正向提示词
+        negative_prompt       最终负向提示词
+        reference_material_id 使用的参考素材
+        raw_params            生成参数 JSON
+        raw_response          API 原始响应摘要 JSON
+        cost_estimate         成本估算
+        output_has_alpha      是否透明背景
+        postprocess_status    后处理状态
+
+    materials 表建议增加：
+
+        width
+        height
+        mime_type
+        file_size
+        processed_subject_path
+        processed_mask_path
+
+    orders 表建议增加：
+
+        final_brief_json
+        production_notes
+        export_package_path
+
+5. Prompt 模板系统
+
+    建议新增文件：
+
+        backend/app/prompts/plush_sample_prompt.py
+
+    分三层：
+
+        1. 全局强制规则
+        2. 订单 brief 字段
+        3. 当前任务约束
+
+    全局强制规则：
+
+        STRICT PRODUCT BRIEF:
+        Create a professional manufacturable plush toy prototype sample.
+        Full body centered, product catalog sample quality.
+        Use real soft plush fabric, visible fibers, embroidered eyes,
+        stitched facial details, fabric clothing, fabric accessories,
+        soft stuffed rounded limbs, visible seams, factory-sample construction.
+
+        MUST preserve the reference subject identity, species, gender impression,
+        silhouette, hairstyle or ears, face shape, outfit, colors, shoes, bag,
+        accessories, symbols and signature details.
+
+        Do not reinterpret hair buns as animal ears.
+        Do not change a human/person/doll character into an animal, bear,
+        mouse, mascot or monster.
+
+    订单字段拼接：
+
+        Character identity:
+        Must preserve key features:
+        Must preserve color palette:
+        Must preserve accessories:
+        Preferred plush materials:
+        Production constraints:
+
+    任务约束：
+
+        main:
+            final main sample view, full body visible, centered.
+
+        front:
+            exact front orthographic view, same character.
+
+        side:
+            exact side profile orthographic view, same character.
+
+        back:
+            exact back orthographic view, same character.
+
+        local_modify:
+            apply only the requested change, keep locked regions unchanged.
+
+六、前端模块改造
+
+1. 生成面板增加模型选择器
+
+    位置：
+
+        GenerationPanel 顶部按钮区
+
+    控件：
+
+        Provider 下拉框：
+            GPT 高质量样品图
+            ComfyUI 本地草稿
+            Replicate 云端备用
+
+        Model 下拉框：
+            随 provider 改变
+
+        Quality 模式：
+            草稿
+            样品
+            最终确认
+
+    示例 UI：
+
+        模型： [GPT 高质量样品图 v]
+        质量： [样品图 v]
+        背景： [透明背景 ✓]
+        [生成主视图候选]
+
+2. 生成记录显示模型信息
+
+    卡片底部显示：
+
+        provider/model
+        duration
+        cost estimate
+        status
+
+    版本历史表增加：
+
+        模型
+        质量
+        是否透明背景
+        成本
+
+3. 参考图选择
+
+    当前自动选最新 reference/photo/sketch。
+
+    建议前端允许用户选择：
+
+        使用哪张素材作为主参考图
+
+    UI：
+
+        参考图：[素材缩略图下拉 / 单选]
+
+4. 图片透明背景显示
+
+    已经改成棋盘格背景。
+
+    后续建议增加：
+
+        查看原图
+        下载 PNG
+        下载透明 PNG
+        重新去背景
+
+七、模型供应商接入方案
+
+1. OpenAI GPT Image Provider
+
+    用途：
+
+        高质量客户样品图
+        参考图转毛绒样品
+        局部修改
+        透明背景输出
+
+    配置：
+
+        OPENAI_API_KEY
+        OPENAI_IMAGE_MODEL
+
+    质量模式：
+
+        sample:
+            高质量样品图
+
+        final:
+            最终客户确认图
+
+    注意：
+
+        GPT Image 更适合主视图高质量生成。
+        多视图一致性仍需要测试，必要时用 GPT 生成主图，ComfyUI 辅助三视图。
+
+2. ComfyUI Provider
+
+    用途：
+
+        本地草稿
+        低成本多次尝试
+        本地离线工作
+
+    推荐增强：
+
+        IPAdapter
+        ControlNet
+        SAM / rembg
+        Plush toy LoRA
+        transparent background postprocess
+
+    质量模式：
+
+        draft:
+            快速草稿
+
+        sample:
+            加强 prompt 和后处理
+
+3. Replicate Provider
+
+    用途：
+
+        云端备用
+        使用 Flux / SDXL / ControlNet 等模型
+
+    配置：
+
+        REPLICATE_API_TOKEN
+
+    适合：
+
+        备用生成
+        批量草稿
+        特定模型试验
+
+4. 国内 Provider
+
+    可规划：
+
+        Tongyi Wanxiang Provider
+        Jimeng Provider
+        Liblib Provider
+        Kling Provider
+
+    接入方式：
+
+        每个 provider 都实现统一 ImageProvider 接口。
+
+八、图片预处理和后处理
+
+1. 参考图预处理
+
+    目标：
+
+        不破坏主体完整性。
+        不强抠。
+        去掉明显背景干扰。
+        保留发型、配件、衣服、鞋、包。
+
+    当前策略：
+
+        Pillow edge-background removal
+        conservative crop
+        fallback to full image if subject too small
+
+    建议升级：
+
+        rembg
+        SAM
+        用户手动框选主体
+
+2. 输出后处理
+
+    目标：
+
+        最终 PNG 尽量只保留玩偶主体。
+
+    当前策略：
+
+        从边缘 flood-fill 背景，转 alpha。
+
+    建议升级：
+
+        rembg/SAM 去背景
+        Alpha matting
+        用户一键重新去背景
+
+九、导出模块升级
+
+1. 客户确认板
+
+    当前：
+
+        Pillow 简单拼图
+
+    建议：
+
+        HTML 模板 + Playwright 截图/PDF
+
+    内容：
+
+        订单号
+        客户名
+        主视图
+        正面/侧面/背面
+        角色说明
+        尺寸
+        材质
+        颜色
+        配件
+        关键特征
+        待确认项
+        版本号
+        日期
+
+2. 工厂资料包
+
+    导出目录：
+
+        exports/PT-XXXX/
+
+    包含：
+
+        01_brief.json
+        02_customer_board.pdf
+        03_main_sample.png
+        04_front.png
+        05_side.png
+        06_back.png
+        07_materials/
+        08_generation_history.json
+
+十、实施优先级
+
+第一阶段：模型选择器和 GPT 高质量模式
+
+    目标：
+
+        让用户可选择 GPT / ComfyUI / Replicate。
+        主图可以走 GPT 高质量。
+
+    开发内容：
+
+        1. 后端 provider registry
+        2. GET /api/providers
+        3. POST /api/generation/generate 支持 provider/model/quality_mode
+        4. 前端生成面板增加模型选择器
+        5. generation_records 保存 provider/model/prompt
+
+    验收：
+
+        1. ComfyUI 可继续生成
+        2. Mock 可测试
+        3. OpenAI key 配置后可生成高质量样品图
+        4. 生成记录能看到使用的模型
+
+第二阶段：GPT Image 高质量样品图
+
+    目标：
+
+        接近用户提供的 GPT 样品图效果。
+
+    开发内容：
+
+        1. OpenAI provider 支持参考图输入
+        2. 支持透明背景参数
+        3. 使用统一 plush prompt
+        4. 输出 PNG 保存
+        5. 记录成本和耗时
+
+    验收：
+
+        1. 人偶不会轻易变动物
+        2. 发型/衣服/配件保留明显提升
+        3. 1-3 次内可出客户可看的主图候选
+
+第三阶段：ComfyUI 草稿模式增强
+
+    目标：
+
+        保留本地低成本能力。
+
+    开发内容：
+
+        1. 增加 draft/sample 参数
+        2. 加强参考图预处理
+        3. 后续接 IPAdapter / ControlNet / LoRA
+
+    验收：
+
+        1. 草稿图可用于方向探索
+        2. 不要求达到 GPT 效果
+
+第四阶段：确认板和资料包
+
+    目标：
+
+        系统从出图工具升级为打样交付工具。
+
+    开发内容：
+
+        1. HTML/PDF 确认板
+        2. 工厂资料包导出
+        3. 多视图和 brief 一起导出
+
+    验收：
+
+        1. 可直接发客户确认
+        2. 可交给工厂初步打样沟通
+
+十一、风险和注意事项
+
+1. GPT Image 成本
+
+    高质量模式需要 API 成本。
+    需要记录每次生成成本。
+    可加权限或二次确认。
+
+2. 商用版权
+
+    参考图可能涉及 IP。
+    系统应标注“素材版权由用户负责”。
+
+3. 模型稳定性
+
+    不同 provider 结果差异大。
+    需要版本记录和 prompt 记录。
+
+4. 透明背景
+
+    模型生成的背景不一定天然透明。
+    后处理可能误删主体。
+    需要用户可重新处理或手动选择保守模式。
+
+5. 多视图一致性
+
+    仅靠图生图很难保证三视图完全一致。
+    后续可能需要专门 workflow 或人工辅助。
+
+十二、推荐当前下一步
+
+建议立刻开发：
+
+    第一阶段：模型选择器 + provider registry
+
+然后接：
+
+    第二阶段：OpenAI GPT Image 高质量样品图 provider
+
+理由：
+
+    1. 这是最接近你目标效果的路线。
+    2. 不会废掉现有 ComfyUI。
+    3. 系统会从“单模型生成器”变成“多模型打样工作台”。
+    4. 后续接国内热门 API 也有统一入口。
+
+十三、最终目标流程
+
+    新建订单
+    -> 上传参考图 / 聊天截图 / 手绘图
+    -> 系统整理 brief
+    -> 设计师补充关键特征
+    -> 选择模型：GPT 高质量样品图
+    -> 生成 2-4 张主视图候选
+    -> 选择确认版本
+    -> 局部修改
+    -> 生成三视图
+    -> 导出客户确认板
+    -> 导出工厂打样资料包
+
+十四、一句话总结
+
+    你的系统应当从“AI 毛绒滤镜”升级为“毛绒玩具打样设计工作台”。
+    ComfyUI 负责低成本草稿，GPT Image 负责高质量客户样品图，
+    后端 provider registry 负责接入未来更多热门模型 API，
+    确认板和资料包负责把图片结果变成可交付的打样流程。
