@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+desktop/node_modules/
+
+# Build outputs
+dist/
+desktop/dist/
+desktop/src-tauri/target/
+target/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local data and generated assets
+data/
+outputs/
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+provider_settings.json
+data/provider_settings.json
+
+# Logs and temporary files
+*.log
+*.tmp
+desktop/vite-ui-check.*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

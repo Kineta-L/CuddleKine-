@@ -1,0 +1,111 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "RealVisXL_V5.0_fp16.safetensors"
+    }
+  },
+  "8": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": ["1", 0],
+      "clip": ["1", 1],
+      "lora_name": "sdxl-plushie-johnowhitaker.safetensors",
+      "strength_model": 0.30,
+      "strength_clip": 0.14
+    }
+  },
+  "2": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["8", 1],
+      "text": "PLACEHOLDER_PROMPT"
+    }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["8", 1],
+      "text": "PLACEHOLDER_NEGATIVE"
+    }
+  },
+  "4": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "REFERENCE_IMAGE.png"
+    }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1536,
+      "batch_size": 1
+    }
+  },
+  "9": {
+    "class_type": "PrepImageForClipVision",
+    "inputs": {
+      "image": ["4", 0],
+      "interpolation": "LANCZOS",
+      "crop_position": "pad",
+      "sharpening": 0.08
+    }
+  },
+  "10": {
+    "class_type": "IPAdapterModelLoader",
+    "inputs": {
+      "ipadapter_file": "ip-adapter-plus_sdxl_vit-h.safetensors"
+    }
+  },
+  "11": {
+    "class_type": "CLIPVisionLoader",
+    "inputs": {
+      "clip_name": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
+    }
+  },
+  "12": {
+    "class_type": "IPAdapterAdvanced",
+    "inputs": {
+      "model": ["8", 0],
+      "ipadapter": ["10", 0],
+      "image": ["9", 0],
+      "clip_vision": ["11", 0],
+      "weight": 0.74,
+      "weight_type": "linear",
+      "combine_embeds": "concat",
+      "start_at": 0.0,
+      "end_at": 0.66,
+      "embeds_scaling": "K+mean(V) w/ C penalty"
+    }
+  },
+  "6": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["12", 0],
+      "positive": ["2", 0],
+      "negative": ["3", 0],
+      "latent_image": ["5", 0],
+      "seed": 42,
+      "steps": 34,
+      "cfg": 7.0,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0
+    }
+  },
+  "7": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["6", 0],
+      "vae": ["1", 2]
+    }
+  },
+  "13": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["7", 0],
+      "filename_prefix": "cuddlekine_reference"
+    }
+  }
+}
