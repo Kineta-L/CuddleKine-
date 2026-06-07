@@ -30,6 +30,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "agnes_api_key": AGNES_API_KEY,
     "comfyui_base_url": COMFYUI_BASE_URL,
     "comfyui_input_dir": str(COMFYUI_INPUT_DIR),
+    "cos_secret_id": "",
+    "cos_secret_key": "",
+    "cos_bucket": "",
+    "cos_region": "ap-guangzhou",
+    "cos_url_expire_seconds": "3600",
 }
 
 
@@ -52,6 +57,8 @@ def save_settings(patch: dict[str, Any]) -> dict[str, Any]:
             continue
         if key in ("openai_api_key", "replicate_api_token", "agnes_api_key"):
             current[key] = _normalize_secret(str(value))
+        elif key in ("cos_secret_id", "cos_secret_key"):
+            current[key] = str(value).strip().strip('"').strip("'")
         elif key in ("transparent_background",):
             current[key] = bool(value)
         else:
@@ -74,6 +81,15 @@ def public_settings() -> dict[str, Any]:
         "agnes_configured": bool(settings["agnes_api_key"]),
         "comfyui_base_url": settings["comfyui_base_url"],
         "comfyui_input_dir": settings["comfyui_input_dir"],
+        "cos_configured": bool(
+            settings["cos_secret_id"]
+            and settings["cos_secret_key"]
+            and settings["cos_bucket"]
+            and settings["cos_region"]
+        ),
+        "cos_bucket": settings["cos_bucket"],
+        "cos_region": settings["cos_region"],
+        "cos_url_expire_seconds": settings["cos_url_expire_seconds"],
         "settings_path": str(SETTINGS_PATH),
     }
 
@@ -116,3 +132,14 @@ def get_comfyui_base_url() -> str:
 
 def get_comfyui_input_dir() -> Path:
     return Path(str(load_settings().get("comfyui_input_dir") or COMFYUI_INPUT_DIR))
+
+
+def get_cos_settings() -> dict[str, str]:
+    settings = load_settings()
+    return {
+        "secret_id": str(settings.get("cos_secret_id") or "").strip(),
+        "secret_key": str(settings.get("cos_secret_key") or "").strip(),
+        "bucket": str(settings.get("cos_bucket") or "").strip(),
+        "region": str(settings.get("cos_region") or "").strip(),
+        "url_expire_seconds": str(settings.get("cos_url_expire_seconds") or "3600").strip(),
+    }

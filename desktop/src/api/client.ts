@@ -194,6 +194,10 @@ export interface AppSettings {
   openai_configured: boolean;
   replicate_configured: boolean;
   agnes_configured: boolean;
+  cos_configured: boolean;
+  cos_bucket: string;
+  cos_region: string;
+  cos_url_expire_seconds: string;
   comfyui_base_url: string;
   comfyui_input_dir: string;
   settings_path: string;
@@ -205,6 +209,11 @@ export const settingsApi = {
     openai_api_key?: string;
     replicate_api_token?: string;
     agnes_api_key?: string;
+    cos_secret_id?: string;
+    cos_secret_key?: string;
+    cos_bucket?: string;
+    cos_region?: string;
+    cos_url_expire_seconds?: string;
   }) =>
     request<AppSettings>("/api/settings", {
       method: "PUT",

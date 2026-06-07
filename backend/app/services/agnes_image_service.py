@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import asyncio
 import json
 import time
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Optional
 import httpx
 
 from ..config import AGNES_API_KEY, AGNES_BASE_URL
+from .cos_storage_service import CosStorageError, upload_reference_for_url
 from .settings_service import get_agnes_api_key
 
 
@@ -126,13 +128,10 @@ class AgnesImageService:
 
         last_error = ""
         async with httpx.AsyncClient(timeout=180) as client:
+            reference_urls = await self._resolve_reference_images(reference_images or [])
             for model in candidates:
-                body = self._build_generation_body(model, prompt, size, reference_images or [])
-                resp = await client.post(
-                    f"{self.base_url}/images/generations",
-                    headers=self._headers(),
-                    json=body,
-                )
+                body = self._build_generation_body(model, prompt, size, reference_urls)
+                resp = await self._post_generation(client, body)
                 if resp.status_code == 200:
                     return model, self._parse_response(resp)
                 last_error = self._safe_json(resp.text)
@@ -149,7 +148,7 @@ class AgnesImageService:
         model: str,
         prompt: str,
         size: str,
-        reference_images: list[str],
+        reference_urls: list[str],
     ) -> dict:
         body: dict = {
             "model": model,
@@ -157,13 +156,35 @@ class AgnesImageService:
             "n": 1,
             "size": size,
         }
-        if reference_images:
+        if reference_urls:
             body["tags"] = ["img2img"]
             body["extra_body"] = {
-                "image": [self._resolve_reference_image(path) for path in reference_images[:4]],
+                "image": reference_urls[:4],
                 "response_format": "url",
             }
         return body
+
+    async def _post_generation(self, client: httpx.AsyncClient, body: dict) -> httpx.Response:
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                return await client.post(
+                    f"{self.base_url}/images/generations",
+                    headers=self._headers(),
+                    json=body,
+                )
+            except (
+                httpx.RemoteProtocolError,
+                httpx.ReadError,
+                httpx.ConnectError,
+                httpx.TimeoutException,
+            ) as exc:
+                last_error = exc
+                if attempt < 2:
+                    await asyncio.sleep(1.5 * (attempt + 1))
+                    continue
+                break
+        raise AgnesImageError(f"Agnes API network disconnected after retries: {last_error}")
 
     @staticmethod
     def _is_valid_reference(file_path: str) -> bool:
@@ -179,13 +200,25 @@ class AgnesImageService:
             return "image/webp"
         return "image/png"
 
-    def _resolve_reference_image(self, file_path: str) -> str:
+    async def _resolve_reference_images(self, file_paths: list[str]) -> list[str]:
+        urls: list[str] = []
+        for path in file_paths[:4]:
+            urls.append(await self._resolve_reference_image(path))
+        return urls
+
+    async def _resolve_reference_image(self, file_path: str) -> str:
         if file_path.startswith(("http://", "https://", "data:")):
             return file_path
         path = Path(file_path)
         if not path.exists():
             raise AgnesImageError(f"Reference image does not exist: {file_path}")
-        return self._encode_data_uri(path)
+        try:
+            return await upload_reference_for_url(str(path))
+        except CosStorageError as exc:
+            raise AgnesImageError(
+                "Agnes needs a cloud-accessible reference image URL. "
+                f"Configure Tencent COS in Settings first. {exc}"
+            ) from exc
 
     def _encode_data_uri(self, path: Path) -> str:
         data = base64.b64encode(path.read_bytes()).decode("ascii")

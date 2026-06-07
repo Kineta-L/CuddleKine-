@@ -19,6 +19,11 @@ class SettingsUpdate(BaseModel):
     agnes_api_key: Optional[str] = None
     comfyui_base_url: Optional[str] = None
     comfyui_input_dir: Optional[str] = None
+    cos_secret_id: Optional[str] = None
+    cos_secret_key: Optional[str] = None
+    cos_bucket: Optional[str] = None
+    cos_region: Optional[str] = None
+    cos_url_expire_seconds: Optional[str] = None
 
 
 @router.get("")
