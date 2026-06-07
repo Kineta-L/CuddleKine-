@@ -162,6 +162,7 @@ async def generate_image(data: GenerateRequest, db: Session = Depends(get_db)):
     prompt_pack = _build_prompt_pack(order, brief, data, provider_id, quality_mode)
     source_material_ids = data.source_material_ids or _source_material_ids_from_brief(brief)
     ref_images = _reference_images(order.id, data, source_material_ids, db)
+    _ensure_reference_mode_supported(provider, provider_id, ref_images)
 
     output_dir = GENERATED_DIR / str(data.order_id)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -290,6 +291,7 @@ async def batch_multiview(data: GenerateRequest, db: Session = Depends(get_db)):
     await _ensure_provider_ready(provider_id, provider)
     brief = _resolve_generation_brief(order, data, quality_mode, db)
     source_material_ids = data.source_material_ids or _source_material_ids_from_brief(brief)
+    _ensure_reference_mode_supported(provider, provider_id, [source_gen.file_path])
     results: list[GenerationResponse] = []
 
     for view_type in ["front", "side", "back"]:
@@ -399,6 +401,24 @@ async def _ensure_provider_ready(provider_id: str, provider) -> None:
         )
     if not health.available:
         raise HTTPException(status_code=400, detail=f"{provider.name} unavailable: {health.message}")
+
+
+def _ensure_reference_mode_supported(provider, provider_id: str, ref_images: list[str]) -> None:
+    if not ref_images or getattr(provider, "supports_image_to_image", False):
+        return
+    if provider_id == "agnes":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Agnes 官网可以识别图片，是因为官网会先把图片上传到 Agnes 可访问的文件地址。"
+                "当前桌面程序里的参考图还是本机文件，Agnes 云端 API 无法直接读取。"
+                "请先改用 ComfyUI / OpenAI-GPT 生成参考图还原，或后续配置一个公开图片上传服务后再启用 Agnes 图生图。"
+            ),
+        )
+    raise HTTPException(
+        status_code=400,
+        detail=f"{provider.name} does not support reference-image generation.",
+    )
 
 
 def _resolve_generation_brief(

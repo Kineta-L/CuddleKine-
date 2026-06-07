@@ -104,6 +104,8 @@ function SettingsModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   const [openaiKey, setOpenaiKey] = useState("");
   const [replicateToken, setReplicateToken] = useState("");
   const [agnesKey, setAgnesKey] = useState("");
+  const [cosSecretId, setCosSecretId] = useState("");
+  const [cosSecretKey, setCosSecretKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -149,11 +151,15 @@ function SettingsModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
       if (openaiKey.trim()) payload.openai_api_key = openaiKey.trim();
       if (replicateToken.trim()) payload.replicate_api_token = replicateToken.trim();
       if (agnesKey.trim()) payload.agnes_api_key = agnesKey.trim();
+      if (cosSecretId.trim()) payload.cos_secret_id = cosSecretId.trim();
+      if (cosSecretKey.trim()) payload.cos_secret_key = cosSecretKey.trim();
       const next = await settingsApi.update(payload);
       setSettings(next);
       setOpenaiKey("");
       setReplicateToken("");
       setAgnesKey("");
+      setCosSecretId("");
+      setCosSecretKey("");
       onSaved();
       onClose();
     } catch (e: any) {
@@ -291,6 +297,65 @@ function SettingsModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
               <input
                 value={settings.comfyui_input_dir}
                 onChange={(e) => setSettings({ ...settings, comfyui_input_dir: e.target.value })}
+              />
+            </div>
+          </section>
+
+          <section className="settings-card settings-card-wide">
+            <div className="settings-card-head">
+              <h4>Tencent COS image bridge</h4>
+              <span className={`settings-pill ${settings.cos_configured ? "ok" : "bad"}`}>
+                {settings.cos_configured ? "configured" : "required for Agnes img2img"}
+              </span>
+            </div>
+            <p className="settings-card-copy">
+              Uploads local reference images to your private COS bucket and sends Agnes a temporary signed URL.
+              Keep the bucket private; the URL expires automatically.
+            </p>
+            <div className="form-row">
+              <div className="form-group">
+                <label>COS Bucket</label>
+                <input
+                  value={settings.cos_bucket}
+                  placeholder="cuddlekine-images-1438398703"
+                  onChange={(e) => setSettings({ ...settings, cos_bucket: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>COS Region</label>
+                <input
+                  value={settings.cos_region}
+                  placeholder="ap-guangzhou"
+                  onChange={(e) => setSettings({ ...settings, cos_region: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>SecretId</label>
+                <input
+                  type="password"
+                  value={cosSecretId}
+                  placeholder="Saved locally; enter a new value to replace"
+                  onChange={(e) => setCosSecretId(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>SecretKey</label>
+                <input
+                  type="password"
+                  value={cosSecretKey}
+                  placeholder="Saved locally; enter a new value to replace"
+                  onChange={(e) => setCosSecretKey(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Signed URL expires in seconds</label>
+              <input
+                value={settings.cos_url_expire_seconds}
+                placeholder="3600"
+                onChange={(e) => setSettings({ ...settings, cos_url_expire_seconds: e.target.value })}
               />
             </div>
           </section>

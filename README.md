@@ -2,7 +2,7 @@
 
 CuddleKine is a desktop AI workbench for plush toy sampling. It helps plush toy designers, small studios, and factory teams turn customer briefs and reference images into manufacturable plush sample images, revision versions, front/side/back views, customer confirmation boards, and factory handoff PDFs.
 
-The app combines a Tauri desktop shell, a React design workbench, a FastAPI backend, SQLite storage, and pluggable image providers such as ComfyUI, OpenAI image models, Replicate, and Agnes.
+The app combines a Tauri desktop shell, a React design workbench, a FastAPI backend, SQLite storage, and pluggable image providers such as ComfyUI, OpenAI image models, Replicate, and Agnes. For cloud providers that need a public image URL, CuddleKine can upload local references to Tencent Cloud COS and pass temporary signed URLs to the model.
 
 ## Screenshots
 
@@ -21,6 +21,7 @@ The app combines a Tauri desktop shell, a React design workbench, a FastAPI back
 - AI-assisted structured brief extraction and designer confirmation
 - Provider selection with local and cloud models
 - OpenAI / Agnes / Replicate / local ComfyUI configuration
+- Tencent Cloud COS image bridge for Agnes image-to-image reference input
 - Main sample generation with short designer-led prompts
 - Front / side / back multi-view generation
 - Brush-mask local revision for a single view
@@ -37,6 +38,7 @@ The app combines a Tauri desktop shell, a React design workbench, a FastAPI back
 - Image tooling: Pillow
 - Local generation: ComfyUI workflows
 - Cloud generation: OpenAI image API, Agnes API, Replicate API
+- Cloud image bridge: Tencent Cloud COS signed URLs
 
 ## Project Structure
 
@@ -58,6 +60,7 @@ docs/                 Product notes, blog draft, screenshots
 - Optional: OpenAI API key
 - Optional: Agnes API key
 - Optional: Replicate API token
+- Optional: Tencent Cloud COS bucket and SecretId/SecretKey for Agnes reference-image generation
 
 ## Quick Start
 
@@ -99,10 +102,29 @@ You can configure:
 - OpenAI API key
 - Agnes API key
 - Replicate API token
+- Tencent Cloud COS SecretId / SecretKey
+- Tencent Cloud COS bucket and region
 - ComfyUI API URL
 - ComfyUI input directory
 
 API keys are stored locally in `data/provider_settings.json`. This file is ignored by Git.
+
+### Tencent COS for Agnes Image-to-Image
+
+Agnes can use reference images when the image is available as a cloud-accessible URL. Since CuddleKine is a local desktop app, uploaded references first live on the user's machine. The COS bridge solves this by:
+
+1. Uploading the selected local reference image to a private Tencent Cloud COS bucket.
+2. Creating a temporary signed URL.
+3. Passing that URL to Agnes `img2img`.
+
+Recommended COS settings:
+
+```text
+Bucket: cuddlekine-images-<appid>
+Region: ap-guangzhou or ap-shanghai
+Access: private read/write
+Signed URL expiry: 3600 seconds
+```
 
 ## Workflow
 
