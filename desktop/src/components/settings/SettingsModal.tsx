@@ -280,6 +280,65 @@ export default function SettingsModal({ onClose, onSaved }: SettingsModalProps) 
 
           <section className="settings-card settings-card-wide">
             <div className="settings-card-head">
+              <h4>Tencent COS image bridge</h4>
+              <span className={`settings-pill ${settings.cos_configured ? "ok" : "bad"}`}>
+                {settings.cos_configured ? "configured" : "required for Agnes img2img"}
+              </span>
+            </div>
+            <p className="settings-card-copy">
+              Uploads local reference images to your private COS bucket and sends Agnes a temporary signed URL.
+              Keep the bucket private; the URL expires automatically.
+            </p>
+            <div className="form-row">
+              <div className="form-group">
+                <label>COS Bucket</label>
+                <input
+                  value={settings.cos_bucket}
+                  placeholder="cuddlekine-images-1438398703"
+                  onChange={(e) => setSettings({ ...settings, cos_bucket: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>COS Region</label>
+                <input
+                  value={settings.cos_region}
+                  placeholder="ap-guangzhou"
+                  onChange={(e) => setSettings({ ...settings, cos_region: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>SecretId</label>
+                <input
+                  type="password"
+                  value={cosSecretId}
+                  placeholder="Saved locally; enter a new value to replace"
+                  onChange={(e) => setCosSecretId(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>SecretKey</label>
+                <input
+                  type="password"
+                  value={cosSecretKey}
+                  placeholder="Saved locally; enter a new value to replace"
+                  onChange={(e) => setCosSecretKey(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Signed URL expires in seconds</label>
+              <input
+                value={settings.cos_url_expire_seconds}
+                placeholder="3600"
+                onChange={(e) => setSettings({ ...settings, cos_url_expire_seconds: e.target.value })}
+              />
+            </div>
+          </section>
+
+          <section className="settings-card settings-card-wide">
+            <div className="settings-card-head">
               <h4>模型清单与能力</h4>
               <span className="settings-pill">{providers.length} providers</span>
             </div>
