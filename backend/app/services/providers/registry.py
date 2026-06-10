@@ -1,10 +1,7 @@
 """Provider 注册中心 — 管理所有图像生成后端"""
 from __future__ import annotations
 
-import importlib
-from typing import Optional
-
-from .base import ImageProvider, GenerateJob, GenerateResult, ProviderHealth, ProviderInfo
+from .base import ImageProvider, ProviderInfo
 
 
 # ── 注册表 ────────────────────────────────────────
@@ -15,6 +12,11 @@ _registry: dict[str, ImageProvider] = {}
 def register_provider(provider: ImageProvider) -> None:
     """注册一个 provider 实例"""
     _registry[provider.id] = provider
+
+
+def has_provider(provider_id: str) -> bool:
+    """Return whether a provider has already been registered."""
+    return provider_id in _registry
 
 
 def get_provider(provider_id: str | None = None) -> ImageProvider:

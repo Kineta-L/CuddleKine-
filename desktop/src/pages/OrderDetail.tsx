@@ -9,6 +9,7 @@ import {
   type Material,
   type Order,
 } from "../api/client";
+import { getErrorMessage } from "../utils/errors";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "草稿",
@@ -108,8 +109,8 @@ export default function OrderDetail() {
       setOrder(loadedOrder);
       setMaterials(loadedMaterials);
       setBriefs(loadedBriefs);
-    } catch (error: any) {
-      alert(`加载失败: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`加载失败: ${getErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -121,8 +122,8 @@ export default function OrderDetail() {
     try {
       await materialsApi.upload(order.id, event.target.files[0], type);
       await loadAll(order.id);
-    } catch (error: any) {
-      alert(`上传失败: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`上传失败: ${getErrorMessage(error)}`);
     } finally {
       setUploading(false);
       event.target.value = "";
@@ -137,8 +138,8 @@ export default function OrderDetail() {
       const brief = await briefsApi.generate(order.id);
       setBriefs([brief, ...briefs]);
       await loadAll(order.id);
-    } catch (error: any) {
-      alert(`AI 分析失败: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`AI 分析失败: ${getErrorMessage(error)}`);
     } finally {
       setAnalyzing(false);
     }
@@ -151,8 +152,8 @@ export default function OrderDetail() {
       await briefsApi.confirm(order.id, latestBrief.id, briefForm);
       await loadAll(order.id);
       alert("brief 已确认，后续样品图会使用这版结构化需求。");
-    } catch (error: any) {
-      alert(`确认失败: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`确认失败: ${getErrorMessage(error)}`);
     } finally {
       setSaving(false);
     }
@@ -169,8 +170,8 @@ export default function OrderDetail() {
         quality_mode: "sample",
       });
       setPromptPreview(preview.provider_prompt);
-    } catch (error: any) {
-      alert(`预览失败: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`预览失败: ${getErrorMessage(error)}`);
     }
   }
 

@@ -4,10 +4,8 @@ from __future__ import annotations
 import json
 import base64
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..config import GENERATED_DIR
@@ -17,75 +15,17 @@ from ..models.generation import GenerationRecord, ViewType
 from ..models.material import Material, MaterialType
 from ..models.order import Order, OrderStatus
 from ..prompts import build_plush_prompt
+from ..schemas.generation import GenerateRequest, GenerationResponse
 from ..services.image_postprocess import normalize_turnaround_canvas
 from ..services.prompt_builder import build_provider_prompt
 from ..services.providers.base import GenerateJob
-from ..services.providers.agnes_provider import AgnesProvider
-from ..services.providers.comfyui_provider import ComfyUIProvider
-from ..services.providers.mock_provider import MockProvider
-from ..services.providers.openai_provider import OpenAIProvider
-from ..services.providers.registry import get_provider, list_providers, register_provider
-from ..services.providers.replicate_provider import ReplicateProvider
+from ..services.providers.bootstrap import ensure_provider_registry
+from ..services.providers.registry import get_provider, list_providers
 from ..services.settings_service import get_default_provider, get_default_quality, load_settings
 
 router = APIRouter(prefix="/api/generation", tags=["generation"])
 
-register_provider(ComfyUIProvider())
-register_provider(OpenAIProvider())
-register_provider(ReplicateProvider())
-register_provider(AgnesProvider())
-register_provider(MockProvider())
-
-
-class GenerateRequest(BaseModel):
-    order_id: int
-    provider: str = ""
-    model: str = ""
-    quality_mode: str = ""
-    workflow_name: str = "main_view.json"
-    view_type: str = "main"
-    derivation_type: str = "main_view_candidate"
-    source_version_id: Optional[int] = None
-    locked_regions: Optional[str] = None
-    modification_prompt: Optional[str] = None
-    model_name: Optional[str] = None
-    reference_material_id: Optional[int] = None
-    transparent_background: Optional[bool] = None
-    overrides: Optional[dict] = None
-
-    # Phase 1 AI engineering fields.
-    brief_id: Optional[int] = None
-    source_material_ids: Optional[list[int]] = None
-    prompt_builder_version: Optional[str] = None
-    use_confirmed_brief_only: bool = True
-
-
-class GenerationResponse(BaseModel):
-    id: int
-    order_id: int
-    provider: str = ""
-    provider_model: str = ""
-    quality_mode: str = "sample"
-    source_version_id: Optional[int]
-    derivation_type: Optional[str]
-    view_type: str
-    file_path: Optional[str]
-    locked_regions: Optional[str]
-    model_name: Optional[str]
-    license_status: Optional[str]
-    workflow_version: Optional[str]
-    duration: Optional[float]
-    error_message: Optional[str]
-    brief_id: Optional[int] = None
-    prompt_builder_version: str = ""
-    final_prompt: str = ""
-    provider_prompt: str = ""
-    source_material_ids: str = ""
-    quality_status: str = "unreviewed"
-    review_notes: str = ""
-    created_at: str
-
-    model_config = {"from_attributes": True}
+ensure_provider_registry()
 
 
 def _generation_response(record: GenerationRecord) -> GenerationResponse:

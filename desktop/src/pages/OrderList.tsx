@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ordersApi, type Order } from "../api/client";
+import { getErrorMessage } from "../utils/errors";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "草稿",
@@ -25,8 +26,8 @@ export default function OrderList() {
       const data = await ordersApi.list();
       setOrders(data);
       setLoaded(true);
-    } catch (error: any) {
-      alert(`加载失败: ${error.message}\n请确认后端服务已启动（端口 8765）。`);
+    } catch (error: unknown) {
+      alert(`加载失败: ${getErrorMessage(error)}\n请确认后端服务已启动（端口 8765）。`);
     } finally {
       setLoading(false);
     }
@@ -36,8 +37,8 @@ export default function OrderList() {
     try {
       const order = await ordersApi.create({});
       navigate(`/orders/${order.id}`);
-    } catch (error: any) {
-      alert(`创建失败: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`创建失败: ${getErrorMessage(error)}`);
     }
   };
 
@@ -46,8 +47,8 @@ export default function OrderList() {
     try {
       await ordersApi.delete(id);
       setOrders(orders.filter((order) => order.id !== id));
-    } catch (error: any) {
-      alert(`删除失败: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`删除失败: ${getErrorMessage(error)}`);
     }
   };
 

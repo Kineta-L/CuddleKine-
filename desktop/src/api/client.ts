@@ -203,18 +203,20 @@ export interface AppSettings {
   settings_path: string;
 }
 
+export type AppSettingsUpdate = Partial<AppSettings> & {
+  openai_api_key?: string;
+  replicate_api_token?: string;
+  agnes_api_key?: string;
+  cos_secret_id?: string;
+  cos_secret_key?: string;
+  cos_bucket?: string;
+  cos_region?: string;
+  cos_url_expire_seconds?: string;
+};
+
 export const settingsApi = {
   get: () => request<AppSettings>("/api/settings"),
-  update: (data: Partial<AppSettings> & {
-    openai_api_key?: string;
-    replicate_api_token?: string;
-    agnes_api_key?: string;
-    cos_secret_id?: string;
-    cos_secret_key?: string;
-    cos_bucket?: string;
-    cos_region?: string;
-    cos_url_expire_seconds?: string;
-  }) =>
+  update: (data: AppSettingsUpdate) =>
     request<AppSettings>("/api/settings", {
       method: "PUT",
       body: JSON.stringify(data),
