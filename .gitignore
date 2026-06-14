@@ -7,6 +7,10 @@ dist/
 desktop/dist/
 desktop/src-tauri/target/
 target/
+/release/
+/release-test-data/
+desktop/src-tauri/resources/backend/*.exe
+desktop/src-tauri/resources/comfyui/
 
 # Python cache
 __pycache__/

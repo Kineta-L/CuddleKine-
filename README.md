@@ -1,8 +1,17 @@
 # CuddleKine
 
-CuddleKine is a desktop AI workbench for plush toy sampling. It helps plush toy designers, small studios, and factory teams turn customer briefs and reference images into manufacturable plush sample images, revision versions, front/side/back views, customer confirmation boards, and factory handoff PDFs.
+CuddleKine is a desktop AI workbench for plush toy sampling. It helps plush toy designers and small studios turn customer briefs and reference images into plush sample images, local revision versions, front/side/back views, customer confirmation boards, and factory handoff PDFs.
 
-The app combines a Tauri desktop shell, a React design workbench, a FastAPI backend, SQLite storage, and pluggable image providers such as ComfyUI, OpenAI image models, Replicate, and Agnes. For cloud providers that need a public image URL, CuddleKine can upload local references to Tencent Cloud COS and pass temporary signed URLs to the model.
+## Download
+
+The recommended way for non-developers is to download the Windows installer from GitHub Releases:
+
+- Open the repository Releases page.
+- Download `CuddleKine-Setup-x.x.x.exe` or the `.msi` installer.
+- Install and open CuddleKine.
+- Configure at least one image model provider in Settings.
+
+Release packages are prepared with the scripts in [`scripts/`](scripts/). See [`docs/release/windows-installer.md`](docs/release/windows-installer.md) if you want to build an installer yourself.
 
 ## Screenshots
 
@@ -14,21 +23,35 @@ The app combines a Tauri desktop shell, a React design workbench, a FastAPI back
 
 ![Generation workbench](docs/screenshots/04-generation-workbench.png)
 
-## Highlights
+## What It Does
 
 - Order-based plush toy sampling workflow
 - Reference image, sketch, screenshot, photo, and text material intake
 - AI-assisted structured brief extraction and designer confirmation
-- Provider selection with local and cloud models
-- OpenAI / Agnes / Replicate / local ComfyUI configuration
-- Tencent Cloud COS image bridge for Agnes image-to-image reference input
-- Main sample generation with short designer-led prompts
+- Provider selection with local and cloud image models
+- OpenAI / Agnes / Replicate / local ComfyUI settings
+- Tencent Cloud COS bridge for cloud image-to-image reference input
+- Main plush sample generation with designer-led prompts
 - Front / side / back multi-view generation
 - Brush-mask local revision for a single view
 - Customer confirmation image export
-- Factory production PDF export with optional fields hidden when empty
-- Factory ZIP handoff with PDF, images, brief JSON, and metadata
-- Local desktop app powered by Tauri
+- Factory production PDF and ZIP export
+
+## Quick Start for Users
+
+1. Install CuddleKine from GitHub Releases.
+2. Open the app and go to Settings.
+3. Choose a provider, such as Agnes, OpenAI, Replicate, or ComfyUI.
+4. Paste your provider API key.
+5. If you use reference-image generation with Agnes, configure Tencent Cloud COS.
+6. Create an order, upload references, confirm the brief, and generate a sample.
+
+Detailed guides:
+
+- [Install CuddleKine](docs/setup/install-cuddlekine.md)
+- [Configure model providers](docs/setup/model-providers.md)
+- [Configure Tencent Cloud COS](docs/setup/tencent-cos.md)
+- [Common issues](docs/setup/troubleshooting.md)
 
 ## Tech Stack
 
@@ -39,6 +62,7 @@ The app combines a Tauri desktop shell, a React design workbench, a FastAPI back
 - Local generation: ComfyUI workflows
 - Cloud generation: OpenAI image API, Agnes API, Replicate API
 - Cloud image bridge: Tencent Cloud COS signed URLs
+- Packaging: Tauri bundler, PyInstaller
 
 ## Project Structure
 
@@ -48,21 +72,11 @@ backend/app/routes/   API routes for orders, materials, generation, export, sett
 backend/app/services/ Provider adapters and image processing services
 comfyui/workflows/    ComfyUI workflow templates
 desktop/              React + Tauri desktop app
-docs/                 Product notes, blog draft, screenshots
+docs/                 Setup guides, release guides, screenshots, notes
+scripts/              Release build scripts
 ```
 
-## Requirements
-
-- Node.js 20+
-- Python 3.12+
-- Rust and Cargo
-- Optional: local ComfyUI installation
-- Optional: OpenAI API key
-- Optional: Agnes API key
-- Optional: Replicate API token
-- Optional: Tencent Cloud COS bucket and SecretId/SecretKey for Agnes reference-image generation
-
-## Quick Start
+## Development Setup
 
 Install frontend dependencies:
 
@@ -87,56 +101,19 @@ cd desktop
 npm run tauri dev
 ```
 
-The Tauri app starts the local backend automatically when possible. During development, the backend API uses `http://127.0.0.1:8765`.
+During development, the backend API uses `http://127.0.0.1:8765`.
 
-## Provider Setup
+## Build a Windows Installer
 
-Open the CuddleKine desktop app and click **Settings** in the top status bar.
-
-You can configure:
-
-- Default provider
-- Default model
-- Default quality mode
-- Transparent background preference
-- OpenAI API key
-- Agnes API key
-- Replicate API token
-- Tencent Cloud COS SecretId / SecretKey
-- Tencent Cloud COS bucket and region
-- ComfyUI API URL
-- ComfyUI input directory
-
-API keys are stored locally in `data/provider_settings.json`. This file is ignored by Git.
-
-### Tencent COS for Agnes Image-to-Image
-
-Agnes can use reference images when the image is available as a cloud-accessible URL. Since CuddleKine is a local desktop app, uploaded references first live on the user's machine. The COS bridge solves this by:
-
-1. Uploading the selected local reference image to a private Tencent Cloud COS bucket.
-2. Creating a temporary signed URL.
-3. Passing that URL to Agnes `img2img`.
-
-Recommended COS settings:
-
-```text
-Bucket: cuddlekine-images-<appid>
-Region: ap-guangzhou or ap-shanghai
-Access: private read/write
-Signed URL expiry: 3600 seconds
+```powershell
+.\scripts\build_windows_installer.ps1
 ```
 
-## Workflow
+The script packages the FastAPI backend with PyInstaller, copies bundled resources for Tauri, and builds the desktop installer. Output files are under:
 
-1. Create an order.
-2. Upload reference images, photos, sketches, screenshots, or text.
-3. Let AI extract a structured brief.
-4. Let the designer confirm or edit the brief.
-5. Generate the main plush sample image.
-6. Confirm the main version.
-7. Generate front / side / back views.
-8. Use brush-mask revision for individual view fixes.
-9. Export a customer confirmation image or factory production PDF/ZIP.
+```text
+desktop/src-tauri/target/release/bundle
+```
 
 ## Security Notes
 
@@ -145,39 +122,19 @@ Never commit:
 - `data/provider_settings.json`
 - SQLite databases in `data/`
 - generated images in `outputs/`
-- API keys or tokens
+- API keys, COS SecretId, COS SecretKey, or provider tokens
 
-If a token was pasted into a public issue, chat, or commit, revoke it from the provider dashboard and create a new one.
+If a token was pasted into a public issue, chat, screenshot, or commit, revoke it from the provider dashboard and create a new one.
 
 ## Development Checks
 
-Backend syntax check:
-
 ```powershell
 python -m compileall backend\app
-```
-
-Frontend build:
-
-```powershell
 cd desktop
 npm run build
-```
-
-Tauri Rust check:
-
-```powershell
-cd desktop\src-tauri
+cd src-tauri
 cargo check
 ```
-
-## Roadmap
-
-- Cost tracking per provider
-- Better model capability scoring
-- Stronger view-to-view consistency review
-- Factory material specification templates
-- Optional cloud deployment for team collaboration
 
 ## License
 
